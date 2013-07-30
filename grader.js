@@ -24,8 +24,11 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var sys = require('util');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var URL_DEFAULT = "http://arcane-meadow-8504.herokuapp.com/";
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -35,6 +38,42 @@ var assertFileExists = function(infile) {
     }
     return instr;
 };
+
+var assertURLexists = function(url) {
+    var instr = 'download.html';
+    console.log("passing url: %s to restler", url);
+
+    var result = rest.get(url).on('complete', function(response) {
+	if (response instanceof Error) {
+	    console.log("url: %s does not exist. Exiting.", url);
+	    process.exit(1);
+	    //this.retry(5000); // try again after 5 sec
+	} else {
+	    console.log('will try to download');
+	    response;
+	    
+	}
+    });
+
+    fs.writeFileSync(__dirname + '/download.html', result, function(err) {
+	if (err) throw err;
+	console.log('saved in download.html.');
+    });
+
+    console.log("returning %s", instr);
+    return instr;
+};
+
+
+var response2console = function(result, response) {
+    if (result instanceof Error) {
+        console.error('Error: ' + util.format(response.message));
+    } else {
+        console.error("Wrote download.html");
+        fs.writeFileSync(__dirname + '/download.html',result);
+    }
+};
+
 
 var cheerioHtmlFile = function(htmlfile) {
     return cheerio.load(fs.readFileSync(htmlfile));
@@ -65,10 +104,26 @@ if(require.main == module) {
     program
 	.option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
 	.option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+	.option('-u, --url <url-path>', 'URL', URL_DEFAULT)
 	.parse(process.argv);
     var checkJson = checkHtmlFile(program.file, program.checks);
+    //var checkURLjson = checkHtmlFile(program.url, program.checks);
     var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+    //console.log(outJson);
+    
+    var response2console = function(result, response) {
+	if (result instanceof Error) {
+            console.error('Error: ' + util.format(response.message));
+	} else {
+            //console.error("Wrote download.html");
+            fs.writeFileSync(__dirname + '/download.html',result);
+	}
+    };
+
+    rest.get(program.url).on('complete', response2console);
+    var checkURLjson = checkHtmlFile('download.html', program.checks);
+    var outURLjson = JSON.stringify(checkURLjson, null, 4);
+    console.log(outURLjson);
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
